@@ -25,8 +25,8 @@ uint64_t mod_exp(uint64_t base, uint64_t exp, uint64_t mod) {
   uint64_t res = 1;
   base = base % mod;
   while (exp > 0) {
-    if (exp % 2 == 1) res = (uint64_t)((res * base) % mod);
-    base = (uint64_t)((base * base) % mod);
+    if (exp % 2 == 1) res = (uint64_t)(((unsigned __int128)res * base) % mod);
+    base = (uint64_t)(((unsigned __int128)base * base) % mod);
     exp >>= 1;
   }
   return res;
@@ -56,7 +56,7 @@ vector<uint64_t> naive_ntt(vector<uint64_t> a, uint64_t q, const vector<uint64_t
         uint64_t sum = 0;
         for (uint64_t j = 0; j < N; j++) {
             uint64_t idx = (i * j) % N;
-            uint64_t coef = (uint64_t)(a[j] * W[idx] % q);
+            uint64_t coef = (uint64_t)(((unsigned __int128)a[j] * W[idx]) % q);
             sum = (sum + coef) % q;
         }
         result[i] = sum;
@@ -67,7 +67,7 @@ vector<uint64_t> naive_ntt(vector<uint64_t> a, uint64_t q, const vector<uint64_t
 vector<uint64_t> naive_intt(vector<uint64_t> a, uint64_t q, const vector<uint64_t> inv_W, const uint64_t inv_N) {
     a = naive_ntt(a, q, inv_W);
     for (uint64_t i = 0; i < a.size(); i++) {
-      a[i] = (uint64_t)((a[i] * inv_N) % q);
+      a[i] = (uint64_t)(((unsigned __int128)a[i] * inv_N) % q);
     }
 
     return a;
@@ -134,6 +134,7 @@ int main() {
     for (uint32_t j = 0; j < N; j++) {
       if (res_naive[j] != original_rns_poly[i][j]) {
         printf("Error, mismatch at limb %d idx %d \n", i, j);
+        printf("NTT Result: %ld - Original Coefficient: %ld \n", res_naive[j], original_rns_poly[i][j]);
         return 1;
       }
     }
@@ -141,7 +142,8 @@ int main() {
 
   
 
-  printf("Naive Time: %f ms\n", naive_time);
+  printf("Naive NTT completed successfully\n");
+  printf("Naive NTT Time: %f ms\n", naive_time);
   return 0;
 
 }
