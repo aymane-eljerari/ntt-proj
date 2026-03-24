@@ -9,6 +9,14 @@
 using namespace lbcrypto;
 using namespace std;
 
+struct RNSLimbParams {
+  uint64_t q;
+  uint64_t inv_N;
+  uint64_t root;
+  uint64_t inv_root;
+};
+
+
 /* ----------------------
     helper functions 
 ------------------------- */
@@ -29,12 +37,41 @@ uint64_t mod_inverse(uint64_t a, uint64_t q) {
   return mod_exp(a, q - 2, q); 
 }
 
-struct RNSLimbParams {
-  uint64_t q;
-  uint64_t inv_N;
-  uint64_t root;
-  uint64_t inv_root;
-};
+vector<uint64_t> generate_sequential_twiddles(uint64_t N, uint64_t q, uint64_t root) {
+  vector<uint64_t> twiddles(N);
+  for (uint64_t i = 0; i < N; i++) twiddles[i] = mod_exp(root, i, q);
+  return twiddles;
+}
+
+
+/* ----------------------
+    naive NTT O(N^2) 
+------------------------- */
+
+vector<uint64_t> naive_ntt(vector<uint64_t> a, uint64_t q, const vector<uint64_t>& W) {
+    uint64_t N = a.size();
+    vector<uint64_t> result(N, 0);
+
+    for (uint64_t i = 0; i < N; i++) {
+        uint64_t sum = 0;
+        for (uint64_t j = 0; j < N; j++) {
+            uint64_t idx = (i * j) % N;
+            uint64_t coef = (uint64_t)(a[j] * W[idx] % q);
+            sum = (sum + coef) % q;
+        }
+        result[i] = sum;
+    }
+    return result;
+}
+
+vector<uint64_t> naive_intt(vector<uint64_t> a, uint64_t q, const vector<uint64_t> inv_W, const uint64_t inv_N) {
+    a = naive_ntt(a, q, inv_W);
+    for (uint64_t i = 0; i < a.size(); i++) {
+      a[i] = (uint64_t)((a[i] * inv_N) % q);
+    }
+
+    return a;
+}
 
 int main() {
   uint32_t N = 1 << 12;
@@ -64,19 +101,47 @@ int main() {
   }
 
   // rng sampling to populate the rns limbs
-  std::mt19937 gen(42);
-  std::vector<std::vector<uint64_t>> original_rns_poly(num_limbs, std::vector<uint64_t>(N));
+  mt19937 gen(42);
+  std::vector<std::vector<uint64_t>> original_rns_poly(num_limbs, vector<uint64_t>(N));
   for (uint32_t i = 0; i < num_limbs; i++) {
-    std::uniform_int_distribution<uint64_t> dist(0, rns_params[i].q - 1);
+    uniform_int_distribution<uint64_t> dist(0, rns_params[i].q - 1);
     for (uint64_t j = 0; j < N; j++) {
         original_rns_poly[i][j] = dist(gen);
         // print first 10 coefficients of the first limb
-        if (i == 0 && j < 10){
-            printf(" %lu ", original_rns_poly[i][j]);
-        }
+        // if (i == 0 && j < 10){
+        //     printf(" %lu ", original_rns_poly[i][j]);
+        // }
     }
   }
 
+  double naive_time = 0;
+
+  for (uint32_t i = 0; i < num_limbs; i++) {
+    std::vector<uint64_t> poly = original_rns_poly[i];
+    uint64_t q = rns_params[i].q;
+
+    // generate twiddle
+    std::vector<uint64_t> W = generate_sequential_twiddles(N, q, rns_params[i].root);
+    std::vector<uint64_t> inv_W = generate_sequential_twiddles(N, q, rns_params[i].inv_root);
+
+    auto start = std::chrono::high_resolution_clock::now();
+    std::vector<uint64_t> res_naive = naive_ntt(poly, q, W);
+    res_naive = naive_intt(res_naive, q, inv_W, rns_params[i].inv_N);
+    auto end = std::chrono::high_resolution_clock::now();
+    naive_time += std::chrono::duration<double, std::milli>(end - start).count();
+
+    // correctness check
+    for (uint32_t j = 0; j < N; j++) {
+      if (res_naive[j] != original_rns_poly[i][j]) {
+        printf("Error, mismatch at limb %d idx %d \n", i, j);
+        return 1;
+      }
+    }
+  }
+
+  
+
+  printf("Naive Time: %f ms\n", naive_time);
   return 0;
 
 }
