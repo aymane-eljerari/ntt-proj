@@ -101,7 +101,7 @@ std::vector<uint64_t> fast_gs_ntt(std::vector<uint64_t> a, uint64_t q, uint64_t 
   return a;
 }
 
-std::vector<uint64_t> fast_ct_intt(std::vector<uint64_t> a, uint64_t q, uint64_t inv_root) {
+std::vector<uint64_t> fast_ct_intt(std::vector<uint64_t> a, uint64_t q, uint64_t inv_root, uint64_t inv_N) {
   uint64_t N = a.size();
   for (uint64_t len = 2; len <= N; len <<= 1) {
     uint64_t wlen = mod_exp(inv_root, N / len, q);
@@ -117,6 +117,9 @@ std::vector<uint64_t> fast_ct_intt(std::vector<uint64_t> a, uint64_t q, uint64_t
         w = (uint64_t)(((unsigned __int128)w * wlen) % q);
       }
     }
+  }
+  for (uint64_t i = 0; i < N; i++) {
+    a[i] = (uint64_t)(((unsigned __int128)a[i] * inv_N) % q);
   }
   return a;
 }
@@ -192,7 +195,7 @@ int main() {
     // fast
     start = std::chrono::high_resolution_clock::now();
     std::vector<uint64_t> res_fast = fast_gs_ntt(poly, q, rns_params[i].root);
-    res_fast = fast_ct_intt(res_fast, q, rns_params[i].inv_root);
+    res_fast = fast_ct_intt(res_fast, q, rns_params[i].inv_root, rns_params[i].inv_N);
     end = std::chrono::high_resolution_clock::now();
     fast_time += std::chrono::duration<double, std::milli>(end - start).count();
 
