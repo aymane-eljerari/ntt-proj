@@ -14,6 +14,8 @@ struct RNSLimbParams {
   uint64_t inv_N;
   uint64_t root;
   uint64_t inv_root;
+  vector<uint64_t> omega_pow;
+  vector<uint64_t> inv_omega_pow;
 };
 
 
@@ -37,8 +39,8 @@ uint64_t mod_inverse(uint64_t a, uint64_t q) {
   return mod_exp(a, q - 2, q); 
 }
 
-vector<uint64_t> generate_sequential_twiddles(uint64_t N, uint64_t q, uint64_t root) {
-  vector<uint64_t> twiddles(N);
+std::vector<uint64_t> generate_sequential_twiddles(uint64_t N, uint64_t q, uint64_t root) {
+  std::vector<uint64_t> twiddles(N);
   for (uint64_t i = 0; i < N; i++) twiddles[i] = mod_exp(root, i, q);
   return twiddles;
 }
@@ -73,11 +75,63 @@ vector<uint64_t> naive_intt(vector<uint64_t> a, uint64_t q, const vector<uint64_
     return a;
 }
 
+/*
+------------------------
+  fast NTT O(n log n)
+------------------------
+*/
+
+std::vector<uint64_t> fast_gs_ntt(std::vector<uint64_t> a, uint64_t q, uint64_t root) {
+  uint64_t N = a.size();
+  for (uint64_t len = N; len >= 2; len >>= 1) {
+    uint64_t wlen = mod_exp(root, N / len, q);
+    for (uint64_t i = 0; i < N; i += len) {
+      uint64_t w = 1;
+      for (uint64_t j = 0; j < len / 2; j++) {
+        uint64_t u = a[i + j];
+        uint64_t v = a[i + j + len / 2];
+        a[i + j] = (u + v) % q;
+        uint64_t diff = (u + q - v) % q; 
+        
+        a[i + j + len / 2] = (uint64_t)(((unsigned __int128)diff * w) % q);
+        w = (uint64_t)(((unsigned __int128)w * wlen) % q);
+      }
+    }
+  }
+  return a;
+}
+
+std::vector<uint64_t> fast_ct_intt(std::vector<uint64_t> a, uint64_t q, uint64_t inv_root) {
+  uint64_t N = a.size();
+  for (uint64_t len = 2; len <= N; len <<= 1) {
+    uint64_t wlen = mod_exp(inv_root, N / len, q);
+    for (uint64_t i = 0; i < N; i += len) {
+      uint64_t w = 1;
+      for (uint64_t j = 0; j < len / 2; j++) {
+        uint64_t u = a[i + j];
+        uint64_t v = (uint64_t)(((unsigned __int128)a[i + j + len / 2] * w) % q);
+        
+        a[i + j] = (u + v) % q;
+        a[i + j + len / 2] = (u + q - v) % q;
+        
+        w = (uint64_t)(((unsigned __int128)w * wlen) % q);
+      }
+    }
+  }
+  return a;
+}
+
+/*
+------------------------
+  benchmaking
+------------------------
+*/
+
 int main() {
   uint32_t N = 1 << 12;
   uint32_t cyclotomic_order = 2 * N;
-  uint32_t bit_size = 54;
-  uint32_t num_limbs = 32;
+  uint32_t bit_size = 32;
+  uint32_t num_limbs = 8;
 
   // init rns polynomial + get the first prime
   std::vector<RNSLimbParams> rns_params(num_limbs);
@@ -96,6 +150,9 @@ int main() {
     rns_params[i].inv_root = inv_omega;
     rns_params[i].inv_N = inv_N;
 
+    rns_params[i].omega_pow = generate_sequential_twiddles(N, q, omega);
+    rns_params[i].inv_omega_pow = generate_sequential_twiddles(N, q, inv_omega);
+   
     current_prime = NextPrime<NativeInteger>(current_prime, cyclotomic_order);
 
   }
@@ -115,35 +172,47 @@ int main() {
   }
 
   double naive_time = 0;
+  double fast_time = 0;
 
   for (uint32_t i = 0; i < num_limbs; i++) {
     std::vector<uint64_t> poly = original_rns_poly[i];
     uint64_t q = rns_params[i].q;
 
-    // generate twiddle
+    // generate twiddles
     std::vector<uint64_t> W = generate_sequential_twiddles(N, q, rns_params[i].root);
     std::vector<uint64_t> inv_W = generate_sequential_twiddles(N, q, rns_params[i].inv_root);
 
+    // naive
     auto start = std::chrono::high_resolution_clock::now();
     std::vector<uint64_t> res_naive = naive_ntt(poly, q, W);
     res_naive = naive_intt(res_naive, q, inv_W, rns_params[i].inv_N);
     auto end = std::chrono::high_resolution_clock::now();
     naive_time += std::chrono::duration<double, std::milli>(end - start).count();
 
+    // fast
+    start = std::chrono::high_resolution_clock::now();
+    std::vector<uint64_t> res_fast = fast_gs_ntt(poly, q, rns_params[i].root);
+    res_fast = fast_ct_intt(res_fast, q, rns_params[i].inv_root);
+    end = std::chrono::high_resolution_clock::now();
+    fast_time += std::chrono::duration<double, std::milli>(end - start).count();
+
     // correctness check
     for (uint32_t j = 0; j < N; j++) {
       if (res_naive[j] != original_rns_poly[i][j]) {
-        printf("Error, mismatch at limb %d idx %d \n", i, j);
+        printf("Naive NTT Error, mismatch at limb %d idx %d \n", i, j);
+        printf("NTT Result: %ld - Original Coefficient: %ld \n", res_naive[j], original_rns_poly[i][j]);
+        return 1;
+      }
+      if (res_fast[j] != original_rns_poly[i][j]) {
+        printf("Fast NTT Error, mismatch at limb %d idx %d \n", i, j);
         printf("NTT Result: %ld - Original Coefficient: %ld \n", res_naive[j], original_rns_poly[i][j]);
         return 1;
       }
     }
   }
 
-  
-
-  printf("Naive NTT completed successfully\n");
   printf("Naive NTT Time: %f ms\n", naive_time);
+  printf("Fast NTT Time: %f ms\n", fast_time);
   return 0;
 
 }
