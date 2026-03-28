@@ -125,6 +125,61 @@ std::vector<uint32_t> fast_ct_intt(std::vector<uint32_t> a, uint32_t q, uint32_t
 }
 
 /*
+-----------------------------------------
+    production NTT (precomputed twiddles)
+-----------------------------------------
+*/
+std::vector<uint32_t> prod_gs_ntt(std::vector<uint32_t> a, uint32_t q, const std::vector<uint32_t>& omega_pow) {
+  uint32_t N = a.size();
+  for (uint32_t len = N; len >= 2; len >>= 1) {
+    uint32_t step = N / len;
+    uint32_t half_len = len / 2;
+    for (uint32_t i = 0; i < N; i += len) {
+      for (uint32_t j = 0; j < half_len; j++) {
+        // Fetch precomputed twiddle factor
+        uint32_t w = omega_pow[j * step];
+        
+        uint32_t u = a[i + j];
+        uint32_t v = a[i + j + half_len];
+        
+        a[i + j] = (uint32_t)((u + v) % q);
+        uint32_t diff = (uint32_t)((u + q - v) % q); 
+        
+        a[i + j + half_len] = (uint32_t)(((uint64_t)diff * w) % q);
+      }
+    }
+  }
+  return a;
+}
+
+std::vector<uint32_t> prod_ct_intt(std::vector<uint32_t> a, uint32_t q, const std::vector<uint32_t>& inv_omega_pow, uint32_t inv_N) {
+  uint32_t N = a.size();
+  for (uint32_t len = 2; len <= N; len <<= 1) {
+    uint32_t step = N / len;
+    uint32_t half_len = len / 2;
+    for (uint32_t i = 0; i < N; i += len) {
+      for (uint32_t j = 0; j < half_len; j++) {
+        // Fetch precomputed inverse twiddle factor
+        uint32_t w = inv_omega_pow[j * step];
+        
+        uint32_t u = a[i + j];
+        uint32_t v = (uint32_t)(((uint64_t)a[i + j + half_len] * w) % q);
+        
+        a[i + j] = (uint32_t)((u + v) % q);
+        a[i + j + half_len] = (uint32_t)((u + q - v) % q);
+      }
+    }
+  }
+  
+  // Multiply by modular inverse of N
+  for (uint32_t i = 0; i < N; i++) {
+    a[i] = (uint32_t)(((uint64_t)a[i] * inv_N) % q);
+  }
+  return a;
+}
+
+
+/*
 ------------------------
   benchmaking
 ------------------------
@@ -176,6 +231,7 @@ int main() {
 
   double naive_time = 0;
   double fast_time = 0;
+  double prod_time = 0;
 
   for (uint32_t i = 0; i < num_limbs; i++) {
     std::vector<uint32_t> poly = original_rns_poly[i];
@@ -199,6 +255,13 @@ int main() {
     end = std::chrono::high_resolution_clock::now();
     fast_time += std::chrono::duration<double, std::milli>(end - start).count();
 
+    // production
+    auto start_prod = std::chrono::high_resolution_clock::now();
+    std::vector<uint32_t> res_prod = prod_gs_ntt(poly, q, rns_params[i].omega_pow);
+    res_prod = prod_ct_intt(res_prod, q, rns_params[i].inv_omega_pow, rns_params[i].inv_N);
+    auto end_prod = std::chrono::high_resolution_clock::now();
+    prod_time = std::chrono::duration<double, std::milli>(end_prod - start_prod).count();
+
     // correctness check
     for (uint32_t j = 0; j < N; j++) {
       if (res_naive[j] != original_rns_poly[i][j]) {
@@ -211,11 +274,17 @@ int main() {
         printf("NTT Result: %u - Original Coefficient: %u \n", res_naive[j], original_rns_poly[i][j]);
         return 1;
       }
+      if (res_prod[j] != original_rns_poly[i][j]) {
+        printf("Prod NTT Error, mismatch at limb %d idx %d \n", i, j);
+        printf("NTT Result: %u - Original Coefficient: %u \n", res_naive[j], original_rns_poly[i][j]);
+        return 1;
+      }
     }
   }
 
   printf("Naive NTT Time: %f ms\n", naive_time);
   printf("Fast NTT Time: %f ms\n", fast_time);
+  printf("Prod NTT Time: %f ms\n", prod_time);
   return 0;
 
 }
