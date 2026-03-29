@@ -17,12 +17,15 @@ WORKDIR /opt/workspace
 RUN git clone https://github.com/openfheorg/openfhe-development.git openfhe && \
     cd openfhe && \
     cmake -B build -S . \
+      -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DBUILD_SHARED=ON \
       -DBUILD_STATIC=ON \
       -DBUILD_UNITTESTS=OFF \
       -DBUILD_EXAMPLES=OFF \
-      -DBUILD_BENCHMARKS=ON && \
+      -DBUILD_BENCHMARKS=ON \
+      -DWITH_OPENMP=ON \
+      -DWITH_NATIVEOPT=ON && \
     cmake --build build -j$(nproc) && \
     cmake --install build
 
