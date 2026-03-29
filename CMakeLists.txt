@@ -17,14 +17,6 @@ include_directories(${OpenFHE_INCLUDE}/third-party/include)
 
 link_directories(${OpenFHE_LIBDIR})
 
-add_executable(cpu-naive cpu-naive.cpp)
-add_executable(cpu-rns cpu-rns.cpp)
-
-add_executable(cpu-baseline cpu-baseline.cpp)
-
-target_link_libraries(cpu-naive PRIVATE ${OpenFHE_SHARED_LIBRARIES})
-target_link_libraries(cpu-rns PRIVATE ${OpenFHE_SHARED_LIBRARIES})
-
 target_link_libraries(cpu-baseline PRIVATE ${OpenFHE_SHARED_LIBRARIES})
 target_compile_options(cpu-baseline PRIVATE -O3)
 
