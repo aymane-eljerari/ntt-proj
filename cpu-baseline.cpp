@@ -6,6 +6,8 @@
 #include <vector>
 #include <chrono>
 
+#define NUM_RUNS 1
+
 using namespace lbcrypto;
 using namespace std;
 
@@ -97,7 +99,6 @@ vector<uint32_t> naive_intt(vector<uint32_t> a, uint32_t q, uint64_t mu, const v
     for (uint32_t i = 0; i < a.size(); i++) {
       a[i] = mod_mul(a[i], inv_N, q, mu);
     }
-
     return a;
 }
 
@@ -213,7 +214,7 @@ int main() {
   uint32_t N = 1 << 10;
   uint32_t cyclotomic_order = 2 * N;
   uint32_t bit_size = 30;
-  uint32_t num_limbs = 24;
+  uint32_t num_limbs = 32;
 
   // init rns polynomial + get the first prime
   std::vector<RNSLimbParams> rns_params(num_limbs);
@@ -258,54 +259,60 @@ int main() {
   double fast_time = 0;
   double prod_time = 0;
 
-  for (uint32_t i = 0; i < num_limbs; i++) {
-    std::vector<uint32_t> poly = original_rns_poly[i];
-    uint32_t q = rns_params[i].q;
+  for (uint32_t run = 0; run < NUM_RUNS; run++) {
+    for (uint32_t i = 0; i < num_limbs; i++) {
+      std::vector<uint32_t> poly = original_rns_poly[i];
+      uint32_t q = rns_params[i].q;
 
-    // generate twiddles
-    std::vector<uint32_t> W = generate_sequential_twiddles(N, q, rns_params[i].root);
-    std::vector<uint32_t> inv_W = generate_sequential_twiddles(N, q, rns_params[i].inv_root);
+      // generate twiddles
+      std::vector<uint32_t> W = generate_sequential_twiddles(N, q, rns_params[i].root);
+      std::vector<uint32_t> inv_W = generate_sequential_twiddles(N, q, rns_params[i].inv_root);
 
-    // naive
-    auto start = std::chrono::high_resolution_clock::now();
-    std::vector<uint32_t> res_naive = naive_ntt(poly, q, rns_params[i].mu, W);
-    res_naive = naive_intt(res_naive, q, rns_params[i].mu, inv_W, rns_params[i].inv_N);
-    auto end = std::chrono::high_resolution_clock::now();
-    naive_time += std::chrono::duration<double, std::milli>(end - start).count();
+      // naive
+      auto start = std::chrono::high_resolution_clock::now();
+      std::vector<uint32_t> res_naive = naive_ntt(poly, q, rns_params[i].mu, W);
+      res_naive = naive_intt(res_naive, q, rns_params[i].mu, inv_W, rns_params[i].inv_N);
+      auto end = std::chrono::high_resolution_clock::now();
+      naive_time += std::chrono::duration<double, std::milli>(end - start).count();
 
-    // fast
-    start = std::chrono::high_resolution_clock::now();
-    std::vector<uint32_t> res_fast = fast_gs_ntt(poly, q, rns_params[i].mu, rns_params[i].root);
-    res_fast = fast_ct_intt(res_fast, q, rns_params[i].mu, rns_params[i].inv_root, rns_params[i].inv_N);
-    end = std::chrono::high_resolution_clock::now();
-    fast_time += std::chrono::duration<double, std::milli>(end - start).count();
+      // fast
+      start = std::chrono::high_resolution_clock::now();
+      std::vector<uint32_t> res_fast = fast_gs_ntt(poly, q, rns_params[i].mu, rns_params[i].root);
+      res_fast = fast_ct_intt(res_fast, q, rns_params[i].mu, rns_params[i].inv_root, rns_params[i].inv_N);
+      end = std::chrono::high_resolution_clock::now();
+      fast_time += std::chrono::duration<double, std::milli>(end - start).count();
 
-    // production
-    auto start_prod = std::chrono::high_resolution_clock::now();
-    std::vector<uint32_t> res_prod = prod_gs_ntt(poly, q, rns_params[i].mu, rns_params[i].omega_pow);
-    res_prod = prod_ct_intt(res_prod, q, rns_params[i].mu, rns_params[i].inv_omega_pow, rns_params[i].inv_N);
-    auto end_prod = std::chrono::high_resolution_clock::now();
-    prod_time = std::chrono::duration<double, std::milli>(end_prod - start_prod).count();
+      // production
+      auto start_prod = std::chrono::high_resolution_clock::now();
+      std::vector<uint32_t> res_prod = prod_gs_ntt(poly, q, rns_params[i].mu, rns_params[i].omega_pow);
+      res_prod = prod_ct_intt(res_prod, q, rns_params[i].mu, rns_params[i].inv_omega_pow, rns_params[i].inv_N);
+      auto end_prod = std::chrono::high_resolution_clock::now();
+      prod_time += std::chrono::duration<double, std::milli>(end_prod - start_prod).count();
 
-    // correctness check
-    for (uint32_t j = 0; j < N; j++) {
-      if (res_naive[j] != original_rns_poly[i][j]) {
-        printf("Naive NTT Error, mismatch at limb %d idx %d \n", i, j);
-        printf("NTT Result: %u - Original Coefficient: %u \n", res_naive[j], original_rns_poly[i][j]);
-        return 1;
-      }
-      if (res_fast[j] != original_rns_poly[i][j]) {
-        printf("Fast NTT Error, mismatch at limb %d idx %d \n", i, j);
-        printf("NTT Result: %u - Original Coefficient: %u \n", res_naive[j], original_rns_poly[i][j]);
-        return 1;
-      }
-      if (res_prod[j] != original_rns_poly[i][j]) {
-        printf("Prod NTT Error, mismatch at limb %d idx %d \n", i, j);
-        printf("NTT Result: %u - Original Coefficient: %u \n", res_naive[j], original_rns_poly[i][j]);
-        return 1;
+      // correctness check
+      for (uint32_t j = 0; j < N; j++) {
+        if (res_naive[j] != original_rns_poly[i][j]) {
+          printf("Naive NTT Error, mismatch at limb %d idx %d \n", i, j);
+          printf("NTT Result: %u - Original Coefficient: %u \n", res_naive[j], original_rns_poly[i][j]);
+          return 1;
+        }
+        if (res_fast[j] != original_rns_poly[i][j]) {
+          printf("Fast NTT Error, mismatch at limb %d idx %d \n", i, j);
+          printf("NTT Result: %u - Original Coefficient: %u \n", res_naive[j], original_rns_poly[i][j]);
+          return 1;
+        }
+        if (res_prod[j] != original_rns_poly[i][j]) {
+          printf("Prod NTT Error, mismatch at limb %d idx %d \n", i, j);
+          printf("NTT Result: %u - Original Coefficient: %u \n", res_naive[j], original_rns_poly[i][j]);
+          return 1;
+        }
       }
     }
   }
+
+  naive_time /= NUM_RUNS;
+  fast_time /= NUM_RUNS;
+  prod_time /= NUM_RUNS;
 
   printf("Naive NTT Time: %f ms\n", naive_time);
   printf("Fast NTT Time: %f ms\n", fast_time);
