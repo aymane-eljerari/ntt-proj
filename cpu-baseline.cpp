@@ -11,6 +11,7 @@ using namespace std;
 
 struct RNSLimbParams {
   uint32_t q;
+  uint64_t mu;
   uint32_t inv_N;
   uint32_t root;
   uint32_t inv_root;
@@ -22,6 +23,31 @@ struct RNSLimbParams {
 /* ----------------------
     helper functions 
 ------------------------- */
+
+#ifdef USE_BARRETT
+
+inline uint32_t mod_add(uint32_t a, uint32_t b, uint32_t q) {
+  uint32_t sum = a + b;
+  return (sum >= q) ? sum - q : sum;
+}
+
+inline uint32_t mod_sub(uint32_t a, uint32_t b, uint32_t q) {
+  uint32_t diff = a + q - b;
+  return (diff >= q) ? diff - q : diff;
+}
+
+inline uint32_t mod_mul(uint32_t a, uint32_t b, uint32_t q, uint64_t mu) {
+  uint64_t ab = (uint64_t)a * b;
+  uint64_t q1 = ((__uint128_t)ab * mu) >> 64;
+  uint64_t r = ab - q1 * q;
+  return (r >= q) ? (uint32_t)(r - q) : (uint32_t)r;
+}
+
+#else
+inline uint32_t mod_add(uint32_t a, uint32_t b, uint32_t q) { return (a + b) % q; }
+inline uint32_t mod_sub(uint32_t a, uint32_t b, uint32_t q) { return (a + q - b) % q; }
+inline uint32_t mod_mul(uint32_t a, uint32_t b, uint32_t q, uint64_t mu) { return ((uint64_t)a * b) % q; }
+#endif
 
 uint32_t mod_exp(uint32_t base, uint32_t exp, uint32_t mod) {
   uint32_t res = 1;
@@ -50,7 +76,7 @@ std::vector<uint32_t> generate_sequential_twiddles(uint32_t N, uint32_t q, uint3
     naive NTT O(N^2) 
 ------------------------- */
 
-vector<uint32_t> naive_ntt(vector<uint32_t> a, uint32_t q, const vector<uint32_t>& W) {
+vector<uint32_t> naive_ntt(vector<uint32_t> a, uint32_t q, uint64_t mu, const vector<uint32_t>& W) {
     uint32_t N = a.size();
     vector<uint32_t> result(N, 0);
 
@@ -58,18 +84,18 @@ vector<uint32_t> naive_ntt(vector<uint32_t> a, uint32_t q, const vector<uint32_t
         uint32_t sum = 0;
         for (uint32_t j = 0; j < N; j++) {
             uint32_t idx = (i * j) % N;
-            uint32_t coef = (uint32_t)(((uint64_t)a[j] * W[idx]) % q);
-            sum = (uint32_t)((sum + coef) % q);
+            uint32_t coef = mod_mul(a[j], W[idx], q, mu);
+            sum = mod_add(sum, coef, q);
         }
         result[i] = sum;
     }
     return result;
 }
 
-vector<uint32_t> naive_intt(vector<uint32_t> a, uint32_t q, const vector<uint32_t> inv_W, const uint32_t inv_N) {
-    a = naive_ntt(a, q, inv_W);
+vector<uint32_t> naive_intt(vector<uint32_t> a, uint32_t q, uint64_t mu, const vector<uint32_t> inv_W, const uint32_t inv_N) {
+    a = naive_ntt(a, q, mu, inv_W);
     for (uint32_t i = 0; i < a.size(); i++) {
-      a[i] = (uint32_t)(((uint64_t)a[i] * inv_N) % q);
+      a[i] = mod_mul(a[i], inv_N, q, mu);
     }
 
     return a;
@@ -81,7 +107,7 @@ vector<uint32_t> naive_intt(vector<uint32_t> a, uint32_t q, const vector<uint32_
 ------------------------
 */
 
-std::vector<uint32_t> fast_gs_ntt(std::vector<uint32_t> a, uint32_t q, uint32_t root) {
+std::vector<uint32_t> fast_gs_ntt(std::vector<uint32_t> a, uint32_t q, uint64_t mu, uint32_t root) {
   uint32_t N = a.size();
   for (uint32_t len = N; len >= 2; len >>= 1) {
     uint32_t wlen = mod_exp(root, N / len, q);
@@ -90,18 +116,18 @@ std::vector<uint32_t> fast_gs_ntt(std::vector<uint32_t> a, uint32_t q, uint32_t 
       for (uint32_t j = 0; j < len / 2; j++) {
         uint32_t u = a[i + j];
         uint32_t v = a[i + j + len / 2];
-        a[i + j] = (uint32_t)((u + v) % q);
-        uint32_t diff = (uint32_t)((u + q - v) % q); 
+        a[i + j] = mod_add(u, v, q);
+        uint32_t diff = mod_sub(u, v, q);
         
-        a[i + j + len / 2] = (uint32_t)(((uint64_t)diff * w) % q);
-        w = (uint32_t)(((uint64_t)w * wlen) % q);
+        a[i + j + len / 2] = mod_mul(diff, w, q, mu);
+        w = mod_mul(w, wlen, q, mu);
       }
     }
   }
   return a;
 }
 
-std::vector<uint32_t> fast_ct_intt(std::vector<uint32_t> a, uint32_t q, uint32_t inv_root, uint32_t inv_N) {
+std::vector<uint32_t> fast_ct_intt(std::vector<uint32_t> a, uint32_t q, uint64_t mu, uint32_t inv_root, uint32_t inv_N) {
   uint32_t N = a.size();
   for (uint32_t len = 2; len <= N; len <<= 1) {
     uint32_t wlen = mod_exp(inv_root, N / len, q);
@@ -109,12 +135,12 @@ std::vector<uint32_t> fast_ct_intt(std::vector<uint32_t> a, uint32_t q, uint32_t
       uint32_t w = 1;
       for (uint32_t j = 0; j < len / 2; j++) {
         uint32_t u = a[i + j];
-        uint32_t v = (uint32_t)(((uint64_t)a[i + j + len / 2] * w) % q);
+        uint32_t v = mod_mul(a[i + j + len / 2], w, q, mu);
         
-        a[i + j] = (uint32_t)((u + v) % q);
-        a[i + j + len / 2] = (uint32_t)((u + q - v) % q);
-        
-        w = (uint32_t)(((uint64_t)w * wlen) % q);
+        a[i + j] = mod_add(u, v, q);
+        a[i + j + len / 2] = mod_sub(u, v, q);
+
+        w = mod_mul(w, wlen, q, mu);
       }
     }
   }
@@ -129,7 +155,7 @@ std::vector<uint32_t> fast_ct_intt(std::vector<uint32_t> a, uint32_t q, uint32_t
     production NTT (precomputed twiddles)
 -----------------------------------------
 */
-std::vector<uint32_t> prod_gs_ntt(std::vector<uint32_t> a, uint32_t q, const std::vector<uint32_t>& omega_pow) {
+std::vector<uint32_t> prod_gs_ntt(std::vector<uint32_t> a, uint32_t q, uint64_t mu, const std::vector<uint32_t>& omega_pow) {
   uint32_t N = a.size();
   for (uint32_t len = N; len >= 2; len >>= 1) {
     uint32_t step = N / len;
@@ -142,17 +168,16 @@ std::vector<uint32_t> prod_gs_ntt(std::vector<uint32_t> a, uint32_t q, const std
         uint32_t u = a[i + j];
         uint32_t v = a[i + j + half_len];
         
-        a[i + j] = (uint32_t)((u + v) % q);
-        uint32_t diff = (uint32_t)((u + q - v) % q); 
-        
-        a[i + j + half_len] = (uint32_t)(((uint64_t)diff * w) % q);
+        a[i + j] = mod_add(u, v, q);
+        uint32_t diff = mod_sub(u, v, q);
+        a[i + j + half_len] = mod_mul(diff, w, q, mu);
       }
     }
   }
   return a;
 }
 
-std::vector<uint32_t> prod_ct_intt(std::vector<uint32_t> a, uint32_t q, const std::vector<uint32_t>& inv_omega_pow, uint32_t inv_N) {
+std::vector<uint32_t> prod_ct_intt(std::vector<uint32_t> a, uint32_t q, uint64_t mu, const std::vector<uint32_t>& inv_omega_pow, uint32_t inv_N) {
   uint32_t N = a.size();
   for (uint32_t len = 2; len <= N; len <<= 1) {
     uint32_t step = N / len;
@@ -163,21 +188,20 @@ std::vector<uint32_t> prod_ct_intt(std::vector<uint32_t> a, uint32_t q, const st
         uint32_t w = inv_omega_pow[j * step];
         
         uint32_t u = a[i + j];
-        uint32_t v = (uint32_t)(((uint64_t)a[i + j + half_len] * w) % q);
+        uint32_t v = mod_mul(a[i + j + half_len], w, q, mu);
         
-        a[i + j] = (uint32_t)((u + v) % q);
-        a[i + j + half_len] = (uint32_t)((u + q - v) % q);
+        a[i + j] = mod_add(u, v, q);
+        a[i + j + half_len] = mod_sub(u, v, q);
       }
     }
   }
   
   // Multiply by modular inverse of N
   for (uint32_t i = 0; i < N; i++) {
-    a[i] = (uint32_t)(((uint64_t)a[i] * inv_N) % q);
+    a[i] = mod_mul(a[i], inv_N, q, mu);
   }
   return a;
 }
-
 
 /*
 ------------------------
@@ -189,7 +213,7 @@ int main() {
   uint32_t N = 1 << 10;
   uint32_t cyclotomic_order = 2 * N;
   uint32_t bit_size = 30;
-  uint32_t num_limbs = 16;
+  uint32_t num_limbs = 24;
 
   // init rns polynomial + get the first prime
   std::vector<RNSLimbParams> rns_params(num_limbs);
@@ -204,6 +228,7 @@ int main() {
     uint32_t inv_N = mod_inverse(N, q);
 
     rns_params[i].q = q;
+    rns_params[i].mu = (uint64_t)(((__uint128_t) 1 << 64) / q);
     rns_params[i].root = omega;
     rns_params[i].inv_root = inv_omega;
     rns_params[i].inv_N = inv_N;
@@ -243,22 +268,22 @@ int main() {
 
     // naive
     auto start = std::chrono::high_resolution_clock::now();
-    std::vector<uint32_t> res_naive = naive_ntt(poly, q, W);
-    res_naive = naive_intt(res_naive, q, inv_W, rns_params[i].inv_N);
+    std::vector<uint32_t> res_naive = naive_ntt(poly, q, rns_params[i].mu, W);
+    res_naive = naive_intt(res_naive, q, rns_params[i].mu, inv_W, rns_params[i].inv_N);
     auto end = std::chrono::high_resolution_clock::now();
     naive_time += std::chrono::duration<double, std::milli>(end - start).count();
 
     // fast
     start = std::chrono::high_resolution_clock::now();
-    std::vector<uint32_t> res_fast = fast_gs_ntt(poly, q, rns_params[i].root);
-    res_fast = fast_ct_intt(res_fast, q, rns_params[i].inv_root, rns_params[i].inv_N);
+    std::vector<uint32_t> res_fast = fast_gs_ntt(poly, q, rns_params[i].mu, rns_params[i].root);
+    res_fast = fast_ct_intt(res_fast, q, rns_params[i].mu, rns_params[i].inv_root, rns_params[i].inv_N);
     end = std::chrono::high_resolution_clock::now();
     fast_time += std::chrono::duration<double, std::milli>(end - start).count();
 
     // production
     auto start_prod = std::chrono::high_resolution_clock::now();
-    std::vector<uint32_t> res_prod = prod_gs_ntt(poly, q, rns_params[i].omega_pow);
-    res_prod = prod_ct_intt(res_prod, q, rns_params[i].inv_omega_pow, rns_params[i].inv_N);
+    std::vector<uint32_t> res_prod = prod_gs_ntt(poly, q, rns_params[i].mu, rns_params[i].omega_pow);
+    res_prod = prod_ct_intt(res_prod, q, rns_params[i].mu, rns_params[i].inv_omega_pow, rns_params[i].inv_N);
     auto end_prod = std::chrono::high_resolution_clock::now();
     prod_time = std::chrono::duration<double, std::milli>(end_prod - start_prod).count();
 
