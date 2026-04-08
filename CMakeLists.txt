@@ -1,9 +1,12 @@
 cmake_minimum_required(VERSION 3.14)
-project(NTT_GPU_ACCEL LANGUAGES CXX)
+project(NTT_GPU_ACCEL LANGUAGES CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(CMAKE_CUDA_ARCHITECTURES "70;80")
 
 find_package(OpenFHE REQUIRED)
 find_package(OpenMP REQUIRED)
@@ -22,6 +25,7 @@ link_directories(${OpenFHE_LIBDIR})
 set(OPENFHE_OMP_SOURCES
     src/ntt_cpu.cpp
     src/ntt_openfhe.cpp
+    src/ntt_gpu.cu
     bench/main.cpp
 )
 
@@ -33,6 +37,6 @@ target_compile_definitions(bench_ntt PRIVATE BENCH_NTT)
 
 option(USE_BARRETT "Enable Barrett reduction" OFF)
 if(USE_BARRETT)
-    # target_compile_definitions(cpu-baseline PRIVATE USE_BARRETT)
     target_compile_definitions(bench_ntt PRIVATE USE_BARRETT)
 endif()
+
