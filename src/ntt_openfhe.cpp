@@ -9,6 +9,8 @@ OpenFHEBenchResult benchmark_openfhe_rns_ntt(
     const std::vector<RNSLimbParams>& rns_params, 
     int num_runs) {
 
+    
+    // populate OpenFHE DCRTPoly from RNS params struct
     uint32_t num_limbs = rns_params.size();
 
     std::vector<std::shared_ptr<ILNativeParams>> native_params;
@@ -19,38 +21,18 @@ OpenFHEBenchResult benchmark_openfhe_rns_ntt(
 
     DCRTPoly openfhe_poly(dcrt_params, Format::COEFFICIENT);
     for (uint32_t i = 0; i < num_limbs; i++) {
-        NativeVector vec(N, rns_params[i].q);
+        NativePoly np(native_params[i], Format::COEFFICIENT, true);
+        
         for (uint32_t j = 0; j < N; j++) {
-            vec[j] = original_rns_poly[i][j];
-        }
-        NativePoly np(native_params[i]);
-        np.SetValues(vec, Format::COEFFICIENT);
+            np[j] = original_rns_poly[i][j];
+        } 
         openfhe_poly.SetElementAtIndex(i, np);
     }
-
-    // set and check OMP threads
-    #ifdef BENCH_NTT
-    int max_threads = omp_get_max_threads();
-    int active_threads = 0;
-    
-    omp_set_num_threads(max_threads);
-    
-    #pragma omp parallel
-    {
-        #pragma omp single
-        active_threads = omp_get_num_threads();
-    }
-    
-    printf("\n--- OpenMP State ---\n");
-    printf("Hardware Max Threads: %d\n", max_threads);
-    printf("Threads spawned for testing: %d\n", active_threads);
-    printf("Effective Thread Utilization: %d\n", std::min(active_threads, (int)num_limbs));
-    printf("--------------------------\n\n");
-    #endif
 
     double total_time = 0;
     DCRTPoly temp_poly;
 
+    // launch benchmark
     for (int run = 0; run < num_runs; run++) {
         temp_poly = openfhe_poly;
 
@@ -63,7 +45,7 @@ OpenFHEBenchResult benchmark_openfhe_rns_ntt(
         auto end = std::chrono::high_resolution_clock::now();
         total_time += std::chrono::duration<double, std::milli>(end - start).count();
     }
- 
+
     std::vector<std::vector<uint32_t>> extracted_result(num_limbs, std::vector<uint32_t>(N));
     for (uint32_t i = 0; i < num_limbs; i++) {
         NativePoly limb = openfhe_poly.GetElementAtIndex(i);
