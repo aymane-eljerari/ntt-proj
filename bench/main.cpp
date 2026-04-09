@@ -19,7 +19,7 @@ using namespace std;
 int main(int argc, char** argv) {
     BenchConfig config = parse_args(argc, argv);
     
-    uint32_t N = config.N;
+    uint32_t N = 1 << config.N;
     uint32_t num_limbs = config.num_limbs;
     uint32_t cyclotomic_order = 2 * N;
     uint32_t bit_size = 28;

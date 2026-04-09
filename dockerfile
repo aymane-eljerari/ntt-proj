@@ -1,4 +1,6 @@
-FROM rocm/dev-ubuntu-22.04:latest
+FROM nvidia/cuda:12.6.2-devel-ubuntu24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -11,9 +13,10 @@ RUN apt-get update && apt-get install -y \
     libomp-dev \
     && rm -rf /var/lib/apt/lists/*
 
+ENV PATH="/usr/local/cuda/bin:${PATH}"
+
 WORKDIR /opt/workspace
 
-# Clone and build OpenFHE
 RUN git clone https://github.com/openfheorg/openfhe-development.git openfhe && \
     cd openfhe && \
     cmake -B build -S . \

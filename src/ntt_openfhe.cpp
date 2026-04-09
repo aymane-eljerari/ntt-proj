@@ -48,7 +48,7 @@ OpenFHEBenchResult benchmark_openfhe_rns_ntt(
 
     std::vector<std::vector<uint32_t>> extracted_result(num_limbs, std::vector<uint32_t>(N));
     for (uint32_t i = 0; i < num_limbs; i++) {
-        NativePoly limb = openfhe_poly.GetElementAtIndex(i);
+        NativePoly limb = temp_poly.GetElementAtIndex(i);
         for (uint32_t j = 0; j < N; j++) {
             extracted_result[i][j] = (uint32_t)limb[j].ConvertToInt();
         }
