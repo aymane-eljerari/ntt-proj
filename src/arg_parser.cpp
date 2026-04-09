@@ -9,7 +9,7 @@ BenchConfig parse_args(int argc, char** argv) {
         std::string arg = argv[i];
 
         if (arg == "-N" && i + 1 < argc) {
-            config.N = std::stoi(argv[++i]);
+            config.N = 1 << std::stoi(argv[++i]);
         } else if (arg == "-L" && i + 1 < argc) {
             config.num_limbs = std::stoi(argv[++i]);
         } else if (arg == "-T" && i + 1 < argc) {
@@ -24,7 +24,9 @@ BenchConfig parse_args(int argc, char** argv) {
             config.run_gpu_radix2 = true;
         } else if (arg == "--gpu-radix4") {
             config.run_gpu_radix4 = true;
-        } else if (arg == "-barrett") {
+        } else if (arg == "--openfhe") {
+            config.run_openfhe = true;
+        } else if (arg == "--barrett") {
             config.use_barrett = true;
         } else if (arg == "-h" || arg == "--help") {
             std::cout << "Usage: bench_ntt [options]\n"
@@ -37,7 +39,7 @@ BenchConfig parse_args(int argc, char** argv) {
                       << "  --cpu-prod         Run Production CPU NTT\n"
                       << "  --gpu-radix2       Run GPU Radix-2 NTT\n"
                       << "  --gpu-radix4       Run GPU Radix-4 NTT\n"
-                      << "  -barrett           Enable Barrett reduction on GPU\n";
+                      << "  --barrett          Enable Barrett reduction on GPU\n";
             std::exit(0);
         } else {
             std::cerr << "Unknown argument: " << arg << "\n";
