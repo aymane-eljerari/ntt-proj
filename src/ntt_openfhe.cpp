@@ -8,7 +8,6 @@ OpenFHEBenchResult benchmark_openfhe_rns_ntt(
     uint32_t cyclotomic_order,
     const std::vector<RNSLimbParams>& rns_params, 
     int num_runs) {
-
     
     // populate OpenFHE DCRTPoly from RNS params struct
     uint32_t num_limbs = rns_params.size();

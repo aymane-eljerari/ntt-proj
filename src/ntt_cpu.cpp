@@ -38,7 +38,7 @@ vector<uint32_t> naive_intt(vector<uint32_t> a, uint32_t q, uint64_t mu, const v
 ------------------------
 */
 template <bool UseBarrett>
-std::vector<uint32_t> fast_gs_ntt(std::vector<uint32_t> a, uint32_t q, uint64_t mu, uint32_t root) {
+vector<uint32_t> fast_gs_ntt(vector<uint32_t> a, uint32_t q, uint64_t mu, uint32_t root) {
     uint32_t N = a.size();
     for (uint32_t len = N; len >= 2; len >>= 1) {
         uint32_t wlen = mod_exp<UseBarrett>(root, N / len, q, mu);
@@ -59,7 +59,7 @@ std::vector<uint32_t> fast_gs_ntt(std::vector<uint32_t> a, uint32_t q, uint64_t 
 }
 
 template <bool UseBarrett>
-std::vector<uint32_t> fast_ct_intt(std::vector<uint32_t> a, uint32_t q, uint64_t mu, uint32_t inv_root, uint32_t inv_N) {
+vector<uint32_t> fast_ct_intt(vector<uint32_t> a, uint32_t q, uint64_t mu, uint32_t inv_root, uint32_t inv_N) {
     uint32_t N = a.size();
     for (uint32_t len = 2; len <= N; len <<= 1) {
         uint32_t wlen = mod_exp<UseBarrett>(inv_root, N / len, q, mu);
@@ -88,7 +88,7 @@ std::vector<uint32_t> fast_ct_intt(std::vector<uint32_t> a, uint32_t q, uint64_t
 -----------------------------------------
 */
 template <bool UseBarrett>
-std::vector<uint32_t> prod_gs_ntt(std::vector<uint32_t> a, uint32_t q, uint64_t mu, const std::vector<uint32_t>& omega_pow) {
+vector<uint32_t> prod_gs_ntt(vector<uint32_t> a, uint32_t q, uint64_t mu, const vector<uint32_t>& omega_pow) {
     uint32_t N = a.size();
     for (uint32_t len = N; len >= 2; len >>= 1) {
         uint32_t step = N / len;
@@ -110,7 +110,7 @@ std::vector<uint32_t> prod_gs_ntt(std::vector<uint32_t> a, uint32_t q, uint64_t 
 }
 
 template <bool UseBarrett>
-std::vector<uint32_t> prod_ct_intt(std::vector<uint32_t> a, uint32_t q, uint64_t mu, const std::vector<uint32_t>& inv_omega_pow, uint32_t inv_N) {
+vector<uint32_t> prod_ct_intt(vector<uint32_t> a, uint32_t q, uint64_t mu, const vector<uint32_t>& inv_omega_pow, uint32_t inv_N) {
     uint32_t N = a.size();
     for (uint32_t len = 2; len <= N; len <<= 1) {
         uint32_t step = N / len;
@@ -134,22 +134,21 @@ std::vector<uint32_t> prod_ct_intt(std::vector<uint32_t> a, uint32_t q, uint64_t
     return a;
 }
 
-// --- Explicit Template Instantiations ---
-// This allows the linker to find the functions for both true and false cases.
+// instanciate templates (fixes linker issue)
 template vector<uint32_t> naive_ntt<true>(vector<uint32_t>, uint32_t, uint64_t, const vector<uint32_t>&);
 template vector<uint32_t> naive_ntt<false>(vector<uint32_t>, uint32_t, uint64_t, const vector<uint32_t>&);
 
 template vector<uint32_t> naive_intt<true>(vector<uint32_t>, uint32_t, uint64_t, const vector<uint32_t>&, uint32_t);
 template vector<uint32_t> naive_intt<false>(vector<uint32_t>, uint32_t, uint64_t, const vector<uint32_t>&, uint32_t);
 
-template std::vector<uint32_t> fast_gs_ntt<true>(std::vector<uint32_t>, uint32_t, uint64_t, uint32_t);
-template std::vector<uint32_t> fast_gs_ntt<false>(std::vector<uint32_t>, uint32_t, uint64_t, uint32_t);
+template vector<uint32_t> fast_gs_ntt<true>(vector<uint32_t>, uint32_t, uint64_t, uint32_t);
+template vector<uint32_t> fast_gs_ntt<false>(vector<uint32_t>, uint32_t, uint64_t, uint32_t);
 
-template std::vector<uint32_t> fast_ct_intt<true>(std::vector<uint32_t>, uint32_t, uint64_t, uint32_t, uint32_t);
-template std::vector<uint32_t> fast_ct_intt<false>(std::vector<uint32_t>, uint32_t, uint64_t, uint32_t, uint32_t);
+template vector<uint32_t> fast_ct_intt<true>(vector<uint32_t>, uint32_t, uint64_t, uint32_t, uint32_t);
+template vector<uint32_t> fast_ct_intt<false>(vector<uint32_t>, uint32_t, uint64_t, uint32_t, uint32_t);
 
-template std::vector<uint32_t> prod_gs_ntt<true>(std::vector<uint32_t>, uint32_t, uint64_t, const std::vector<uint32_t>&);
-template std::vector<uint32_t> prod_gs_ntt<false>(std::vector<uint32_t>, uint32_t, uint64_t, const std::vector<uint32_t>&);
+template vector<uint32_t> prod_gs_ntt<true>(vector<uint32_t>, uint32_t, uint64_t, const vector<uint32_t>&);
+template vector<uint32_t> prod_gs_ntt<false>(vector<uint32_t>, uint32_t, uint64_t, const vector<uint32_t>&);
 
-template std::vector<uint32_t> prod_ct_intt<true>(std::vector<uint32_t>, uint32_t, uint64_t, const std::vector<uint32_t>&, uint32_t);
-template std::vector<uint32_t> prod_ct_intt<false>(std::vector<uint32_t>, uint32_t, uint64_t, const std::vector<uint32_t>&, uint32_t);
+template vector<uint32_t> prod_ct_intt<true>(vector<uint32_t>, uint32_t, uint64_t, const vector<uint32_t>&, uint32_t);
+template vector<uint32_t> prod_ct_intt<false>(vector<uint32_t>, uint32_t, uint64_t, const vector<uint32_t>&, uint32_t);
