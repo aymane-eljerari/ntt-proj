@@ -9,7 +9,7 @@ BenchConfig parse_args(int argc, char** argv) {
         std::string arg = argv[i];
 
         if (arg == "-N" && i + 1 < argc) {
-            config.N = 1 << std::stoi(argv[++i]);
+            config.N = std::stoi(argv[++i]);
         } else if (arg == "-L" && i + 1 < argc) {
             config.num_limbs = std::stoi(argv[++i]);
         } else if (arg == "-T" && i + 1 < argc) {
