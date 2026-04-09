@@ -22,7 +22,7 @@ struct BenchConfig {
 
     bool run_all() const {
         return !run_cpu_naive && !run_cpu_fast && !run_cpu_prod && 
-               !run_gpu_radix2 && !run_gpu_radix4;
+               !run_openfhe && !run_gpu_radix2 && !run_gpu_radix4;
     }
 };
 
