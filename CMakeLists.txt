@@ -27,6 +27,8 @@ set(OPENFHE_OMP_SOURCES
     src/ntt_openfhe.cpp
     src/ntt_gpu.cu
     bench/main.cpp
+    src/bench_utils.cpp    
+    src/arg_parser.cpp
 )
 
 add_executable(bench_ntt ${OPENFHE_OMP_SOURCES})
@@ -35,8 +37,4 @@ target_compile_options(bench_ntt PRIVATE -O3)
 target_compile_definitions(bench_ntt PRIVATE BENCH_NTT)
 
 
-option(USE_BARRETT "Enable Barrett reduction" OFF)
-if(USE_BARRETT)
-    target_compile_definitions(bench_ntt PRIVATE USE_BARRETT)
-endif()
 
