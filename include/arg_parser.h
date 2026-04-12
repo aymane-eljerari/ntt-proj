@@ -7,6 +7,7 @@ struct BenchConfig {
     uint32_t N = 12;
     uint32_t num_limbs = 16;
     uint32_t threads = 4;
+    std::string csv_out = "";
 
     bool run_cpu_naive = false;
     bool run_cpu_fast = false;

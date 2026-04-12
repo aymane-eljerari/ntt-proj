@@ -14,6 +14,8 @@ BenchConfig parse_args(int argc, char** argv) {
             config.num_limbs = std::stoi(argv[++i]);
         } else if (arg == "-T" && i + 1 < argc) {
             config.threads = std::stoi(argv[++i]);
+        } else if (arg == "--csv-out" && i + 1 < argc) {
+            config.csv_out = argv[++i];
         } else if (arg == "--cpu-naive") {
             config.run_cpu_naive = true;
         } else if (arg == "--cpu-fast") {
