@@ -213,7 +213,7 @@ std::vector<uint32_t> prod_ct_intt(std::vector<uint32_t> a, uint32_t q, uint64_t
 int main() {
   uint32_t N = 1 << 10;
   uint32_t cyclotomic_order = 2 * N;
-  uint32_t bit_size = 30;
+  uint32_t bit_size = 28;
   uint32_t num_limbs = 32;
 
   // init rns polynomial + get the first prime
@@ -248,10 +248,6 @@ int main() {
     uniform_int_distribution<uint32_t> dist(0, rns_params[i].q - 1);
     for (uint32_t j = 0; j < N; j++) {
         original_rns_poly[i][j] = dist(gen);
-        // print first 10 coefficients of the first limb
-        // if (i == 0 && j < 10){
-        //     printf(" %lu ", original_rns_poly[i][j]);
-        // }
     }
   }
 
