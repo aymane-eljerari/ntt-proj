@@ -117,6 +117,8 @@ void run_benchmarks(const BenchConfig& config,
         
         for (int r = 0; r < num_runs; r++) {
             auto start = std::chrono::high_resolution_clock::now();
+
+            #pragma omp parallel for default(none) shared(L, original_poly, config, rns_params, final_result, r, num_runs)
             for (uint32_t i = 0; i < L; i++) {
                 std::vector<uint32_t> poly = original_poly[i];
                 std::vector<uint32_t> res;
@@ -204,4 +206,30 @@ void run_benchmarks(const BenchConfig& config,
                   << " | " << (res.passed ? "PASS" : "FAIL") << "\n";
     }
     std::cout << "=================================================================\n";
+
+    if (!config.csv_out.empty()) {
+        std::ifstream file_check(config.csv_out);
+        bool write_header = !file_check.good();
+        file_check.close();
+
+        std::ofstream csv_file(config.csv_out, std::ios::app);
+        if (csv_file.is_open()) {
+            if (write_header) {
+                csv_file << "Threads,N,L,Implementation,Total_Time_ms,Avg_Time_ms,Passed\n";
+            }
+            for (const auto& res : results) {
+                csv_file << config.threads << ","
+                         << N << ","
+                         << L << ","
+                         << res.name << ","
+                         << res.total_ms << ","
+                         << res.avg_ms << ","
+                         << (res.passed ? "1" : "0") << "\n";
+            }
+            csv_file.close();
+        } else {
+            std::cerr << "Error: Could not open CSV file " << config.csv_out << " for appending.\n";
+        }
+    }
 }
+
