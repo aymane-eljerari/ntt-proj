@@ -14,11 +14,14 @@
   #text(
     17pt,
     weight: "bold",
-  )[Evaluating the Number Theoretic Tranform on CPU & GPU] \
+  )[CPU & GPU Implementation of the Number Theoretic Tranform] \
   #v(1em)
   #text(14pt)[Aymane El Jerari]\
   #text(12pt)[High Performance Computing]\
-  #text(12pt)[Spring 2026]
+  #text(12pt)[Spring 2026]\
+  #link("https://github.com/aymane-eljerari/ntt-proj")[#text(
+    fill: blue,
+  )[[Github Link]]]
 ]
 
 #let algo-block(title, body) = block(
@@ -295,3 +298,4 @@ Conversely, the L2 cache hit rate demonstrates a distinct advantage for the radi
 
 == Multi-Dimensional Transforms
 Because the standard 1-Dimensional NTT is limited by strided memory access patterns that reduce cache hit rates, alternative data layouts can be used to achieve better performance. The 2D NTT provides such an alternative by mapping the linear 1D polynomial array into a 2D matrix where the NTT is computed first across the rows of the matrix, and then across the columns. This approach ensures that memory accesses remain physically localized in continuous memory blocks, which increases sequential cache hits and improves memory coalescing.
+
